@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 config();
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-console.log("GROQ KEY:", process.env.GROQ_API_KEY);
+
 const MODELS = {
   fast:      'llama-3.1-8b-instant',
   reasoning: 'llama-3.3-70b-versatile',
