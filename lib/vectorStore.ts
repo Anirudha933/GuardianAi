@@ -15,7 +15,7 @@ type SimilarResult = {
   distance: number;
 };
 
-const patterns: Pattern[] = []; // in-memory store
+const patterns: Pattern[] = [];
 
 // 🔹 Retrieve similar patterns
 export async function retrieveSimilar(
@@ -31,26 +31,22 @@ export async function retrieveSimilar(
     .slice(0, k);
 }
 
-// 🔹 Store new pattern
+// 🔹 Store pattern
 export async function storePattern(
   id: string,
   text: string,
   metadata: Pattern['metadata']
 ): Promise<void> {
-  patterns.push({
-    id,
-    text,
-    metadata,
-  });
+  patterns.push({ id, text, metadata });
 }
 
-// 🔹 Check if pattern is novel
+// 🔹 Check novelty
 export async function isNovel(text: string): Promise<boolean> {
   const exists = patterns.some(p => p.text === text);
   return !exists;
 }
 
-// 🔹 Simple similarity function
+// 🔹 Simple similarity
 function similarity(a: string, b: string): number {
   const aWords = new Set(a.toLowerCase().split(/\s+/));
   const bWords = new Set(b.toLowerCase().split(/\s+/));
