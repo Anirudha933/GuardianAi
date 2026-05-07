@@ -3,14 +3,8 @@ import analyseTos from './skills/analyseTos.skill.ts';
 import detectPatterns from './skills/detectPatterns.skill.ts';
 import generateResponse from './skills/generateResponse.skill.ts';
 
-const url = process.argv[2];
-
-if (!url) {
-  console.log("Usage: ts-node run.ts <url>");
-  process.exit(1);
-}
-
-async function main() {
+// ✅ THIS is the important export
+export default async function run(url: string) {
   console.log("Step 1: Scraping...");
   const scrapeResult = await scrape(url);
 
@@ -33,6 +27,17 @@ async function main() {
 
   console.log("\nFINAL OUTPUT:\n");
   console.log(response);
+
+  // ✅ RETURN RESULT (heartbeat needs this)
+  return {
+    detectResult,
+    tosResult,
+    response
+  };
 }
 
-main();
+// 👇 THIS keeps CLI working
+const url = process.argv[2];
+if (url) {
+  run(url);
+}
