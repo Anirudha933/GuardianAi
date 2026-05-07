@@ -2,14 +2,75 @@
 
 import { chromium, Page } from 'playwright';
 import axios from 'axios';
+import { lookup } from 'dns/promises';
+import { isIP } from 'net';
 
 export default async function scrape(url: string) {
+  const safeUrl = await validateScrapeUrl(url);
+
   try {
-    return await playwrightScrape(url);
+    return await playwrightScrape(safeUrl);
   } catch (e) {
     console.warn('Playwright failed, falling back to axios:', e);
-    return await axiosScrape(url);
+    return await axiosScrape(safeUrl);
   }
+}
+
+export async function validateScrapeUrl(url: string): Promise<string> {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Invalid URL protocol');
+  }
+
+  if (isBlockedHost(parsed.hostname)) {
+    throw new Error('Blocked private or local URL');
+  }
+
+  if (!isIP(parsed.hostname)) {
+    const records = await lookup(parsed.hostname, { all: true });
+    if (records.some(record => isBlockedHost(record.address))) {
+      throw new Error('Blocked private or local URL');
+    }
+  }
+
+  return parsed.href;
+}
+
+function isBlockedHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const ipVersion = isIP(host);
+
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+
+  if (ipVersion === 6) {
+    return (
+      host === '::1' ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      host.startsWith('fe80:')
+    );
+  }
+
+  if (ipVersion !== 4) return false;
+
+  const parts = host.split('.').map(Number);
+  const [a, b] = parts;
+
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
 }
 
 async function playwrightScrape(url: string) {
@@ -58,7 +119,9 @@ async function findTos(page: Page, baseUrl: string): Promise<string> {
         : new URL(href, baseUrl).href;
 
       try {
-        await page.goto(full, {
+        const safeFull = await validateScrapeUrl(full);
+
+        await page.goto(safeFull, {
           waitUntil: 'networkidle',
           timeout: 15000,
         });

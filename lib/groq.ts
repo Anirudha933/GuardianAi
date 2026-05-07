@@ -28,9 +28,19 @@ export async function groqCall(
         temperature: 0.1,
         response_format: { type: 'json_object' },
       });
-      return JSON.parse(res.choices[0].message.content ?? '{}');
+      const content = res.choices[0].message.content ?? '{}';
+
+      try {
+        return JSON.parse(content);
+      } catch {
+        return {
+          error: 'groq_parse_failure',
+          message: 'Groq returned invalid JSON',
+          preview: content.slice(0, 200),
+        };
+      }
     } catch (err: any) {
-      if (err?.status === 429) {
+      if (isRateLimitError(err)) {
         const delay = Math.min(2 ** attempt * 2000 + Math.random() * 1000, 30000);
         await new Promise(r => setTimeout(r, delay));
         attempt++;
@@ -41,4 +51,13 @@ export async function groqCall(
     }
   }
   return { error: 'max_retries_exceeded' };
+}
+
+function isRateLimitError(err: any): boolean {
+  return (
+    err?.status === 429 ||
+    err?.statusCode === 429 ||
+    err?.response?.status === 429 ||
+    err?.error?.status === 429
+  );
 }

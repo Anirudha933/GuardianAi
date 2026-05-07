@@ -1,4 +1,4 @@
-import generateResponse from '../skills/generateResponse.skill';
+import generateResponse from '../skills/generateResponse.skill.js';
 
 const res = await generateResponse(
   "https://example.com",

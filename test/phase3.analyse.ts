@@ -1,4 +1,4 @@
-import analyseTos from '../skills/analyseTos.skill';
+import analyseTos from '../skills/analyseTos.skill.js';
 
 const sample = `
 By subscribing to our service, you agree to automatic renewal every month unless cancelled at least 48 hours before billing.

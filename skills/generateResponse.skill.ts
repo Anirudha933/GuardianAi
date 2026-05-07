@@ -1,6 +1,6 @@
 // skills/generateResponse.skill.ts
 
-import { groqCall } from '../lib/groq';
+import { groqCall } from '../lib/groq.js';
 
 export default async function generateResponse(
   url: string,

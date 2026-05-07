@@ -1,7 +1,7 @@
 // test/phase1.test.ts
 import { groqCall } from '../lib/groq.js';
 
-console.log("ENV KEY:", process.env.GROQ_API_KEY);
+console.log("GROQ key configured:", Boolean(process.env.GROQ_API_KEY));
 
 (async () => {
   try {
