@@ -1,50 +1,60 @@
 # GuardianAI
 
-GuardianAI is an AI-powered system that detects dark patterns in websites and Terms of Service, and continuously monitors them for changes.
+GuardianAI is an AI-powered system that detects dark patterns in websites and Terms of Service, and continuously monitors them for changes using an automated heartbeat system.
 
 ---
 
 ## 🚀 Features
 
-* 🔍 **Website Scraping** using Playwright + fallback (axios)
-* 📜 **ToS Analysis** using LLMs
-* 🧠 **Dark Pattern Detection**
-* 🤖 **AI-based Response Generation**
-* 🔁 **Continuous Monitoring (Heartbeat System)**
-* 📌 **Watchlist for tracking websites**
-* 🔄 **Change Detection (Diff System)**
-* 📚 **Research Augmentation (ArXiv API)**
+* 🔍 Website scraping (Playwright + fallback to axios)
+* 📜 AI-based Terms of Service analysis
+* 🧠 Dark pattern detection using LLM reasoning
+* 🤖 User-friendly risk summarization
+* 📌 Watchlist for tracking websites
+* 🔁 Heartbeat system for continuous monitoring
+* 🔄 Stable change detection (pattern-based diff)
+* 📚 Research augmentation using ArXiv API
+* 🧪 Modular test system for Phase 7 components
 
 ---
 
-## ⚙️ Pipeline
+## ⚙️ Core Pipeline
 
 scrape → analyseTos → detectPatterns → generateResponse
 
 ---
 
-## 🧪 Phase 7 Enhancements
+## 🧪 Phase 7 Implementation
 
-### ✅ Watchlist System
+### 🔹 Watchlist System
 
-* Stores URLs in `memory/watchlist.json`
-* Supports adding/removing tracked websites
+* Stores tracked URLs in `memory/watchlist.json`
+* Supports dynamic add/remove operations
+* Used as input for continuous monitoring
 
-### ✅ Heartbeat Monitoring
+---
 
-* Automatically rescans all watchlist URLs every cycle
-* (Demo uses 60 seconds instead of weekly)
+### 🔹 Heartbeat Monitoring
 
-### ✅ Change Detection
+* Automatically rescans watchlist URLs at fixed intervals
+* Demonstration interval: **60 seconds** (simulates weekly scans)
+* Runs the full AI pipeline autonomously
+
+---
+
+### 🔹 Change Detection (Diff System)
 
 * Compares previous vs current results
-* Detects meaningful changes (based on patterns only)
-* Avoids false positives from LLM variability
+* Uses **pattern-based comparison** to avoid LLM noise
+* Triggers updates only on meaningful changes
 
-### ✅ Research Integration
+---
 
-* Fetches related academic research from ArXiv
-* Triggered only when changes are detected
+### 🔹 Research Augmentation
+
+* Fetches related academic content from ArXiv
+* Activated only when changes are detected
+* Improves explainability of results
 
 ---
 
@@ -52,40 +62,56 @@ scrape → analyseTos → detectPatterns → generateResponse
 
 ### Concurrent Load Test
 
-* 3 users
+* 3 concurrent users
 * P95 latency ≈ **5.3 seconds**
-* Stable under controlled load
+* Stable execution under constrained resources
+
+---
 
 ### Sequential Test (Single User)
 
-* Multiple websites scanned sequentially
-* Average time: **5–10 seconds per scan**
-* No performance degradation
+* Multiple applications scanned sequentially
+* Average latency: **5–10 seconds per scan**
+* No degradation across repeated runs
+
+---
+
+## 🧪 Phase 7 Testing
+
+Separate test modules implemented:
+
+* `watchlist.test.ts` → verifies add/remove functionality
+* `research.test.ts` → verifies ArXiv API integration
+* `heartbeat.test.ts` → verifies continuous monitoring loop
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **TypeScript (Node.js)**
-* **Playwright** (web scraping)
-* **Axios** (fallback + API calls)
-* **Groq API / LLMs**
-* **JSON-based storage (memory layer)**
+* TypeScript (Node.js)
+* Playwright (scraping engine)
+* Axios (fallback + API)
+* Groq LLM API
+* JSON-based memory system
 
 ---
 
 ## ▶️ How to Run
 
-### Install dependencies
+### Install
 
 npm install
 npx playwright install chromium
 
-### Run single scan
+---
+
+### Run single analysis
 
 npx ts-node run.ts https://example.com
 
-### Run Phase 7 system (monitoring)
+---
+
+### Run full Phase 7 system
 
 npx ts-node phase7.ts
 
@@ -93,23 +119,23 @@ npx ts-node phase7.ts
 
 ## 🧠 Design Highlights
 
-* Uses **fallback scraping** for robustness
-* Separates **detection logic vs monitoring logic**
-* Uses **pattern-based diffing** to avoid noisy updates
-* Designed for **real-world continuous monitoring**
+* Hybrid scraping (browser + fallback)
+* Separation of analysis vs monitoring layers
+* Noise-resistant diff detection
+* Autonomous system behavior (no manual trigger required)
 
 ---
 
-## ⚠️ Notes
+## ⚠️ Limitations
 
-* Some websites may block scraping (handled via fallback)
-* LLM outputs may vary slightly — handled via stable diff logic
+* LLM outputs may vary slightly (handled via stable diff logic)
+* Some websites block scraping (fallback mitigates this)
 
 ---
 
 ## 🎯 Conclusion
 
-GuardianAI evolves from a static analyzer into a **continuous AI monitoring system**, capable of detecting and tracking dark patterns over time with intelligent change detection.
+GuardianAI evolves from a static analysis tool into a **continuous AI monitoring system**, capable of detecting, tracking, and explaining dark pattern changes over time.
 
 ---
 
