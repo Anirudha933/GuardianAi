@@ -11,7 +11,7 @@ export default async function generateResponse(
   tosResult: {
     highRisk: Array<{ text: string }>;
   }
-) {
+): Promise<string> {
   try {
     const tosText = tosResult.highRisk
       .slice(0, 2)
@@ -47,9 +47,9 @@ Return ONLY JSON:
     // 🔹 Handle multiple response formats
     if (typeof r === 'string') return r;
 
-    if (r?.message) return r.message;
+    if (typeof r?.message === 'string') return r.message;
 
-    if (r?.text) return r.text;
+    if (typeof r?.text === 'string') return r.text;
 
     return `Scan complete for ${url}. Risk: ${patterns.overall_risk ?? 'NONE'}`;
 

@@ -1,8 +1,8 @@
 // skills/detectPatterns.skill.ts
 
 import { groqCall } from '../lib/groq.js';
-import { retrieveSimilar, storePattern, isNovel } from '../lib/vectorStore.ts';
-import { writeNovelQueue } from './novelQueue.ts';
+import { retrieveSimilar, storePattern, isNovel } from '../lib/vectorStore.js';
+import { writeNovelQueue } from './novelQueue.js';
 import { randomUUID } from 'crypto';
 
 export default async function detectPatterns(

@@ -2,7 +2,7 @@ import Groq from 'groq-sdk';
 import { config } from 'dotenv';
 config();
 
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let client: any = null;
 
 const MODELS = {
   fast:      'llama-3.1-8b-instant',
@@ -15,10 +15,11 @@ export async function groqCall(
   systemPrompt = 'Respond only in valid JSON.',
   maxTokens = 1024,
 ): Promise<Record<string, unknown>> {
+  const groq = getClient();
   let attempt = 0;
   while (attempt < 3) {
     try {
-      const res = await client.chat.completions.create({
+      const res = await groq.chat.completions.create({
         model: MODELS[modelKey],
         messages: [
           { role: 'system', content: systemPrompt },
@@ -51,6 +52,17 @@ export async function groqCall(
     }
   }
   return { error: 'max_retries_exceeded' };
+}
+
+function getClient(): any {
+  if (client) return client;
+
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY not set');
+  }
+
+  client = new (Groq as any)({ apiKey: process.env.GROQ_API_KEY });
+  return client;
 }
 
 function isRateLimitError(err: any): boolean {
