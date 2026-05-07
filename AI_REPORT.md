@@ -2,7 +2,7 @@
 
 ## 🧠 Overview
 
-GuardianAI uses Large Language Models (LLMs) to analyze Terms of Service, detect dark patterns, and generate user-friendly responses.
+GuardianAI leverages Large Language Models (LLMs) to analyze Terms of Service, detect dark patterns, and generate structured responses. Phase 7 extends this into a continuous monitoring system.
 
 ---
 
@@ -11,7 +11,7 @@ GuardianAI uses Large Language Models (LLMs) to analyze Terms of Service, detect
 * **llama3-8b**
 
   * Fast inference
-  * Used for filtering and formatting
+  * Used for filtering and formatting outputs
 
 * **llama3-70b**
 
@@ -20,12 +20,12 @@ GuardianAI uses Large Language Models (LLMs) to analyze Terms of Service, detect
 
 ---
 
-## 🔍 Where AI is Used
+## 🔍 AI Responsibilities
 
 ### 1. ToS Analysis
 
-* Extracts clauses from large legal text
-* Classifies clauses into categories:
+* Parses large legal text
+* Extracts clauses and classifies them into:
 
   * data sharing
   * consent
@@ -35,17 +35,17 @@ GuardianAI uses Large Language Models (LLMs) to analyze Terms of Service, detect
 
 ---
 
-### 2. Pattern Detection
+### 2. Dark Pattern Detection
 
-* Uses analyzed ToS + DOM data
-* Identifies potential dark patterns
-* Uses structured reasoning (JSON outputs)
+* Uses DOM + ToS analysis
+* Identifies deceptive UI/UX patterns
+* Produces structured outputs for downstream processing
 
 ---
 
 ### 3. Response Generation
 
-* Converts raw AI output into human-readable format
+* Converts raw AI outputs into readable summaries
 * Provides:
 
   * risk level
@@ -56,49 +56,62 @@ GuardianAI uses Large Language Models (LLMs) to analyze Terms of Service, detect
 
 ## ⚙️ Design Decisions
 
-* **Split-model approach**
+* **Split-model architecture**
 
   * 8B → speed
   * 70B → reasoning
 
 * **Low temperature**
 
-  * Ensures consistent output
   * Reduces randomness
+  * Improves consistency
 
 * **Structured JSON outputs**
 
-  * Improves reliability
-  * Enables deterministic processing
+  * Enables deterministic comparison
+  * Supports diff detection
 
 ---
 
 ## 🔄 Phase 7 AI Integration
 
-* AI results are stored and compared across time
-* Only meaningful changes (pattern-level) trigger updates
-* Reduces noise from LLM variability
+* AI outputs are stored after each scan
+* Compared across time using pattern-level diffing
+* Only meaningful changes trigger alerts
+* Reduces false positives from LLM variability
 
 ---
 
 ## 📚 Research Augmentation
 
-* Uses ArXiv API to fetch related research papers
+* Uses ArXiv API for academic references
 * Triggered when new patterns are detected
-* Enhances explainability of system output
+* Provides explainability for detected behavior
+
+---
+
+## 🧪 Testing Strategy
+
+* Modular testing for each Phase 7 component
+* Independent validation of:
+
+  * watchlist logic
+  * research API integration
+  * heartbeat automation
 
 ---
 
 ## ⚠️ Limitations
 
-* LLM outputs may vary slightly across runs
-* Addressed using pattern-based diff detection
+* Minor variability in ToS clause extraction
+* Addressed via pattern-focused diff detection
 
 ---
 
 ## 🎯 Conclusion
 
-The system effectively combines LLM reasoning with deterministic logic to create a reliable and scalable AI monitoring pipeline.
+GuardianAI successfully combines LLM reasoning with deterministic system design to create a robust, scalable, and continuous monitoring pipeline for detecting dark patterns.
 
 ---
+
 
