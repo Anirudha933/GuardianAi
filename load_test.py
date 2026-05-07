@@ -11,7 +11,7 @@ def run_test():
 
 times = []
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
     futures = [executor.submit(run_test) for _ in range(10)]
     for f in futures:
         times.append(f.result())

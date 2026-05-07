@@ -21,7 +21,7 @@ async function playwrightScrape(url: string) {
 
     await page.goto(url, {
       waitUntil: 'networkidle',
-      timeout: 20000,
+      timeout: 10000,
     });
 
     const dom = (await page.innerText('body')).slice(0, 8000);
