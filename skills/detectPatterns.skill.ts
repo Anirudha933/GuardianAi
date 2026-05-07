@@ -1,6 +1,7 @@
 // skills/detectPatterns.skill.ts
 
 import { groqCall } from '../lib/groq.js';
+
 import {
   retrieveSimilar,
   storePattern,
@@ -8,18 +9,27 @@ import {
 } from '../lib/vectorStore.js';
 
 import { writeNovelQueue } from './novelQueue.js';
+
 import { randomUUID } from 'crypto';
 
 export default async function detectPatterns(
   dom: string,
   tosResult: {
-    clauses: Array<{ text: string; severity: number }>;
-    highRisk: Array<{ text: string }>;
+    clauses: Array<{
+      text: string;
+      severity: number;
+    }>;
+    highRisk: Array<{
+      text: string;
+    }>;
   },
   userHash: string
 ) {
 
-  // Pi Engine passes URL as first token of DOM
+  // =========================================
+  // BASIC URL EXTRACTION
+  // =========================================
+
   const url = dom.slice(0, 100);
 
   // =========================================
@@ -56,7 +66,9 @@ export default async function detectPatterns(
       ? similar
           .map(
             (s, i) =>
-              `Pattern ${i + 1}:\n${s.text}\nSimilarity Distance: ${s.distance.toFixed(2)}`
+              `Pattern ${i + 1}:
+${s.text}
+Similarity Distance: ${s.distance.toFixed(2)}`
           )
           .join('\n\n')
       : 'No prior patterns in knowledge base.';
@@ -81,7 +93,11 @@ export default async function detectPatterns(
   try {
 
     r = await groqCall(
-      `You are GuardianAI. Analyse this website for dark patterns.
+`You are GuardianAI.
+
+Analyse this website for manipulative UX patterns,
+dark patterns, deceptive flows, hidden coercion,
+or exploitative interaction design.
 
 SOUL TAXONOMY:
 roach_motel |
@@ -107,7 +123,21 @@ ${JSON.stringify(
   tosResult.highRisk.slice(0, 5)
 )}
 
-Return ONLY JSON:
+IMPORTANT RULES:
+
+- Only report patterns with strong evidence.
+- Avoid speculative classifications.
+- If no meaningful dark patterns exist,
+  return:
+
+{
+  "patterns": [],
+  "overall_risk": "NONE"
+}
+
+Return ONLY valid JSON.
+
+Required JSON schema:
 
 {
   "patterns":[
@@ -141,7 +171,7 @@ Return ONLY JSON:
   }
 
   // =========================================
-  // HANDLE RESPONSE FORMATS
+  // NORMALIZE RESPONSE FORMAT
   // =========================================
 
   let patterns: Array<{
@@ -162,6 +192,61 @@ Return ONLY JSON:
   }
 
   // =========================================
+  // SAFETY FILTER
+  // Prevent hallucinated / weak patterns
+  // =========================================
+
+  patterns = patterns.filter(p => {
+
+    if (!p?.type) {
+      return false;
+    }
+
+    if (!p?.evidence) {
+      return false;
+    }
+
+    if (
+      typeof p.severity !== 'number'
+    ) {
+      return false;
+    }
+
+    // reject weak hallucinated evidence
+    if (
+      p.evidence.length < 10
+    ) {
+      return false;
+    }
+
+    return true;
+
+  });
+
+  // =========================================
+  // NO-PATTERN FAST EXIT
+  // =========================================
+
+  if (patterns.length === 0) {
+
+    console.log(
+      '[detectPatterns] No meaningful patterns detected'
+    );
+
+    return {
+
+      patterns: [],
+
+      overall_risk:
+        r?.overall_risk ?? 'NONE',
+
+      summary: [],
+
+    };
+
+  }
+
+  // =========================================
   // STORE PATTERNS + NOVEL DETECTION
   // =========================================
 
@@ -171,35 +256,50 @@ Return ONLY JSON:
 
       const patternText =
         `${p.type}: ${p.evidence}`;
-const id = randomUUID();
 
-// Check novelty BEFORE storing
-const novel =
-  await isNovel(patternText);
+      const id = randomUUID();
 
-// Store only if novel
-if (novel) {
+      // =====================================
+      // CHECK NOVELTY FIRST
+      // =====================================
 
-  await storePattern(
-    id,
-    patternText,
-    {
-      url,
-      severity: String(p.severity),
-      userHash,
-    }
-  );
-
-}
-
-      // Novel detection
+      const novel =
+        await isNovel(patternText);
 
       console.log(
         '[detectPatterns] Novel:',
         novel
       );
 
-      // Queue async research
+      // =====================================
+      // STORE ONLY IF NOVEL
+      // =====================================
+
+      if (novel) {
+
+        await storePattern(
+          id,
+          patternText,
+          {
+            url,
+            severity: String(
+              p.severity
+            ),
+            userHash,
+          }
+        );
+
+        console.log(
+          '[detectPatterns] Stored novel pattern:',
+          p.type
+        );
+
+      }
+
+      // =====================================
+      // ASYNC RESEARCH QUEUE
+      // =====================================
+
       if (novel) {
 
         await writeNovelQueue(
@@ -238,7 +338,9 @@ if (novel) {
       r?.overall_risk ?? 'NONE',
 
     summary:
-      patterns.map(p => p.type),
+      patterns.map(
+        p => p.type
+      ),
 
   };
 
