@@ -1,13 +1,10 @@
-// lib/vectorStore.ts
+import { ChromaClient } from 'chromadb';
+import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
 
-type Pattern = {
-  id: string;
-  text: string;
-  metadata: {
-    url: string;
-    severity: string;
-    userHash: string;
-  };
+type PatternMeta = {
+  url: string;
+  severity: string;
+  userHash: string;
 };
 
 type SimilarResult = {
@@ -15,44 +12,180 @@ type SimilarResult = {
   distance: number;
 };
 
-const patterns: Pattern[] = [];
+function getChromaConfig() {
+  const path =
+    process.env.CHROMA_PATH;
 
-// 🔹 Retrieve similar patterns
+  if (path) {
+    const url = new URL(path);
+    const port =
+      url.port ?
+        Number(url.port) :
+        url.protocol === 'https:' ?
+          443 :
+          80;
+
+    return {
+      host: url.hostname,
+      port,
+      ssl: url.protocol === 'https:',
+    };
+  }
+
+  const host =
+    process.env.CHROMA_HOST ||
+    'localhost';
+  const port =
+    process.env.CHROMA_PORT ?
+      Number(process.env.CHROMA_PORT) :
+      8000;
+  const ssl =
+    process.env.CHROMA_SSL === 'true';
+
+  return { host, port, ssl };
+}
+
+const client = new ChromaClient(
+  getChromaConfig()
+);
+
+const COLLECTION = 'guardian_patterns';
+
+// =========================================
+// GET COLLECTION
+// =========================================
+
+async function getCollection() {
+  return await client.getOrCreateCollection({
+    name: COLLECTION,
+    metadata: {
+      'hnsw:space': 'cosine',
+    },
+    embeddingFunction:
+      new DefaultEmbeddingFunction(),
+  });
+}
+
+// =========================================
+// STORE PATTERN
+// =========================================
+
+export async function storePattern(
+  id: string,
+  text: string,
+  metadata: PatternMeta
+): Promise<void> {
+
+  const collection =
+    await getCollection();
+
+  await collection.upsert({
+    ids: [id],
+    documents: [text],
+    metadatas: [metadata],
+  });
+
+  console.log(
+    '[vectorStore] stored pattern:',
+    id
+  );
+}
+
+// =========================================
+// RETRIEVE SIMILAR PATTERNS
+// =========================================
+
 export async function retrieveSimilar(
   text: string,
   k: number = 5
 ): Promise<SimilarResult[]> {
-  return patterns
-    .map(p => ({
-      text: p.text,
-      distance: similarity(text, p.text),
-    }))
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, k);
+
+  const collection =
+    await getCollection();
+
+  const results =
+    await collection.query({
+      queryTexts: [text],
+      nResults: k,
+    });
+
+  const rawDocs =
+    results.documents?.[0] ?? [];
+
+  const rawDistances =
+    results.distances?.[0] ?? [];
+
+  const formatted: SimilarResult[] =
+    rawDocs
+      .map((doc, i) => {
+        if (doc == null) {
+          return null;
+        }
+
+        const distance =
+          rawDistances[i];
+
+        return {
+          text: doc,
+          distance:
+            distance ?? 1,
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is SimilarResult =>
+          item !== null
+      );
+
+  console.log(
+    '[vectorStore] retrieved',
+    formatted.length,
+    'patterns'
+  );
+
+  return formatted;
 }
 
-// 🔹 Store pattern
-export async function storePattern(
-  id: string,
+// =========================================
+// NOVELTY DETECTION
+// =========================================
+
+export async function isNovel(
   text: string,
-  metadata: Pattern['metadata']
-): Promise<void> {
-  patterns.push({ id, text, metadata });
-}
+  threshold: number = 0.75
+): Promise<boolean> {
 
-// 🔹 Check novelty
-export async function isNovel(text: string): Promise<boolean> {
-  const exists = patterns.some(p => p.text === text);
-  return !exists;
-}
+  const collection =
+    await getCollection();
 
-// 🔹 Simple similarity
-function similarity(a: string, b: string): number {
-  const aWords = new Set(a.toLowerCase().split(/\s+/));
-  const bWords = new Set(b.toLowerCase().split(/\s+/));
+  const count =
+    await collection.count();
 
-  const intersection = [...aWords].filter(x => bWords.has(x)).length;
-  const union = new Set([...aWords, ...bWords]).size;
+  if (count === 0) {
+    return true;
+  }
 
-  return union === 0 ? 1 : 1 - intersection / union;
+  const results =
+    await collection.query({
+      queryTexts: [text],
+      nResults: 1,
+    });
+
+  const distance:
+    | number
+    | undefined =
+      results.distances?.[0]?.[0] ??
+      undefined;
+
+  console.log(
+    '[vectorStore] closest distance:',
+    distance
+  );
+
+  if (distance === undefined) {
+    return true;
+  }
+
+  return distance > threshold;
 }

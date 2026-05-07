@@ -1,7 +1,12 @@
 // skills/detectPatterns.skill.ts
 
 import { groqCall } from '../lib/groq.js';
-import { retrieveSimilar, storePattern, isNovel } from '../lib/vectorStore.js';
+import {
+  retrieveSimilar,
+  storePattern,
+  isNovel
+} from '../lib/vectorStore.js';
+
 import { writeNovelQueue } from './novelQueue.js';
 import { randomUUID } from 'crypto';
 
@@ -13,57 +18,132 @@ export default async function detectPatterns(
   },
   userHash: string
 ) {
+
+  // Pi Engine passes URL as first token of DOM
   const url = dom.slice(0, 100);
 
-  // 🔹 Retrieve similar patterns (RAG)
-  let similar: any[] = [];
+  // =========================================
+  // RAG RETRIEVAL
+  // =========================================
+
+  let similar: Array<{
+    text: string;
+    distance: number;
+  }> = [];
+
   try {
-    similar = await retrieveSimilar(dom.slice(0, 200), 5);
+
+    similar = await retrieveSimilar(
+      dom.slice(0, 200),
+      5
+    );
+
   } catch (err) {
-    console.warn("Vector retrieval failed:", err);
+
+    console.warn(
+      '[detectPatterns] Vector retrieval failed:',
+      err
+    );
+
   }
+
+  // =========================================
+  // BUILD RAG CONTEXT
+  // =========================================
 
   const ragContext =
     similar.length > 0
-      ? 'Similar past patterns:\n' +
-        similar
+      ? similar
           .map(
-            (s: any) =>
-              `- ${s.text} (dist: ${s.distance?.toFixed?.(2) ?? "?"})`
+            (s, i) =>
+              `Pattern ${i + 1}:\n${s.text}\nSimilarity Distance: ${s.distance.toFixed(2)}`
           )
-          .join('\n')
+          .join('\n\n')
       : 'No prior patterns in knowledge base.';
 
-  // 🔹 LLM call
+  // =========================================
+  // PHASE 6 VALIDATION LOG
+  // =========================================
+
+  console.log(
+    '[detectPatterns] RAG context:',
+    similar.length > 0
+      ? 'loaded'
+      : 'none'
+  );
+
+  // =========================================
+  // GROQ REASONING CALL
+  // =========================================
+
   let r: any = {};
+
   try {
+
     r = await groqCall(
       `You are GuardianAI. Analyse this website for dark patterns.
-SOUL TAXONOMY: roach_motel | trick_questions | hidden_costs | confirmshaming |
-misdirection | forced_continuity | privacy_zuckering | urgency_manipulation |
-disguised_ads | bait_and_switch | social_proof_manipulation
 
-RAG CONTEXT:
+SOUL TAXONOMY:
+roach_motel |
+trick_questions |
+hidden_costs |
+confirmshaming |
+misdirection |
+forced_continuity |
+privacy_zuckering |
+urgency_manipulation |
+disguised_ads |
+bait_and_switch |
+social_proof_manipulation
+
+RAG CONTEXT (most similar past patterns):
 ${ragContext}
 
 DOM (first 3000 chars):
 ${dom.slice(0, 3000)}
 
 HIGH-RISK ToS CLAUSES:
-${JSON.stringify(tosResult.highRisk.slice(0, 5))}
+${JSON.stringify(
+  tosResult.highRisk.slice(0, 5)
+)}
 
 Return ONLY JSON:
-{"patterns":[{"type":"...","evidence":"...","severity":1-10,"location":"UI|ToS"}],"overall_risk":"HIGH|MEDIUM|LOW|NONE"}`,
+
+{
+  "patterns":[
+    {
+      "type":"...",
+      "evidence":"...",
+      "severity":1-10,
+      "location":"UI|ToS"
+    }
+  ],
+  "overall_risk":"HIGH|MEDIUM|LOW|NONE"
+}`,
       'reasoning',
       undefined,
       1500
     );
+
   } catch (err) {
-    console.error("Pattern detection failed:", err);
-    return { patterns: [], overall_risk: 'NONE', summary: [] };
+
+    console.error(
+      '[detectPatterns] Pattern detection failed:',
+      err
+    );
+
+    return {
+      patterns: [],
+      overall_risk: 'NONE',
+      summary: [],
+    };
+
   }
 
-  // 🔹 Handle multiple response formats
+  // =========================================
+  // HANDLE RESPONSE FORMATS
+  // =========================================
+
   let patterns: Array<{
     type: string;
     evidence: string;
@@ -72,40 +152,94 @@ Return ONLY JSON:
   }> = [];
 
   if (Array.isArray(r)) {
+
     patterns = r;
+
   } else if (r?.patterns) {
+
     patterns = r.patterns;
+
   }
 
-  // 🔹 Store patterns safely
-  for (const p of patterns) {
-    try {
-      const id = randomUUID();
+  // =========================================
+  // STORE PATTERNS + NOVEL DETECTION
+  // =========================================
 
-      await storePattern(
-        id,
-        `${p.type}: ${p.evidence}`,
-        {
-          url,
-          severity: String(p.severity),
-          userHash,
-        }
+  for (const p of patterns) {
+
+    try {
+
+      const patternText =
+        `${p.type}: ${p.evidence}`;
+const id = randomUUID();
+
+// Check novelty BEFORE storing
+const novel =
+  await isNovel(patternText);
+
+// Store only if novel
+if (novel) {
+
+  await storePattern(
+    id,
+    patternText,
+    {
+      url,
+      severity: String(p.severity),
+      userHash,
+    }
+  );
+
+}
+
+      // Novel detection
+
+      console.log(
+        '[detectPatterns] Novel:',
+        novel
       );
 
-      const novel = await isNovel(`${p.type}: ${p.evidence}`);
+      // Queue async research
       if (novel) {
-        await writeNovelQueue(p.type);
+
+        await writeNovelQueue(
+          p.type
+        );
+
+        console.log(
+          '[detectPatterns] Added to novel queue:',
+          p.type
+        );
+
       }
 
     } catch (err) {
-      console.warn("Pattern storage failed:", err);
+
+      console.warn(
+        '[detectPatterns] Pattern storage failed:',
+        err
+      );
+
       continue;
+
     }
+
   }
 
+  // =========================================
+  // FINAL RESPONSE
+  // =========================================
+
   return {
+
     patterns,
-    overall_risk: r?.overall_risk ?? 'NONE',
-    summary: patterns.map(p => p.type),
+
+    overall_risk:
+      r?.overall_risk ?? 'NONE',
+
+    summary:
+      patterns.map(p => p.type),
+
   };
+
 }
