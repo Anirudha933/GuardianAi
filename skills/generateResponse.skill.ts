@@ -1,6 +1,6 @@
 // skills/generateResponse.skill.ts
 
-import { groqCall } from '../lib/groq.js';
+import { routeLLM } from '../lib/llmRouter.js';
 
 export default async function generateResponse(
   url: string,
@@ -18,7 +18,8 @@ export default async function generateResponse(
       .map(c => c.text.slice(0, 60))
       .join(' | '); // ✅ FIX: clean string instead of array
 
-   const r = await groqCall(
+   const r = await routeLLM(
+  'formatting',
   `Generate a Telegram dark pattern report.
 
 STRICT RULES:
@@ -40,7 +41,6 @@ High-risk ToS: ${tosText}
 
 Return ONLY JSON:
 {"message":"..."}`,
-  'fast',
   undefined,
   512
 );

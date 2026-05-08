@@ -1,6 +1,6 @@
 // skills/detectPatterns.skill.ts
 
-import { groqCall } from '../lib/groq.js';
+import { routeLLM } from '../lib/llmRouter.js';
 
 import {
   retrieveSimilar,
@@ -92,7 +92,8 @@ Similarity Distance: ${s.distance.toFixed(2)}`
 
   try {
 
-    r = await groqCall(
+    r = await routeLLM(
+      'classification',
 `You are GuardianAI.
 
 Analyse this website for manipulative UX patterns,
@@ -150,7 +151,6 @@ Required JSON schema:
   ],
   "overall_risk":"HIGH|MEDIUM|LOW|NONE"
 }`,
-      'reasoning',
       undefined,
       1500
     );
