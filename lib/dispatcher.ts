@@ -1,12 +1,31 @@
-import { appendScan } from './memory.js';
-import { hashPhone, isRateLimited } from './security.js';
-import analyseTos from '../skills/analyseTos.skill.js';
-import detectPatterns from '../skills/detectPatterns.skill.js';
-import generateResponse from '../skills/generateResponse.skill.js';
-import scrape, { validateScrapeUrl } from '../skills/scrape.skill.js';
+// lib/dispatcher.ts
+
+import { appendScan } from './memory.ts';
+
+import {
+  hashPhone,
+  isRateLimited
+} from './security.ts';
+
+import {
+  addWatch,
+  removeWatch,
+  getWatchlist,
+  setTelegramChatId
+} from './watchlist.ts';
+import run from './run.ts';
+
+import {
+  validateScrapeUrl
+} from '../skills/scrape.skill.ts';
+
+// =========================================
+// TYPES
+// =========================================
 
 type GuardianMessageInput = {
   userId: string;
+  chatId?: number;
   text: string;
 };
 
@@ -16,65 +35,370 @@ type GuardianMessageResult = {
   rateLimited: boolean;
 };
 
+// =========================================
+// MAIN DISPATCHER
+// =========================================
+
 export async function handleGuardianMessage(
   input: GuardianMessageInput
 ): Promise<GuardianMessageResult> {
-  const userHash = hashPhone(input.userId);
 
-  if (isRateLimited(userHash)) {
-    return {
+  // =======================================
+  // USER HASH
+  // =======================================
+
+  const userHash =
+    hashPhone(input.userId);
+
+    if (
+    input.chatId != null
+  ) {
+
+    setTelegramChatId(
       userHash,
+      input.chatId
+    );
+
+  }
+  // =======================================
+  // RATE LIMIT
+  // =======================================
+
+  if (
+    isRateLimited(userHash)
+  ) {
+
+    return {
+
+      userHash,
+
       rateLimited: true,
-      reply: 'You are sending requests too quickly. Please wait a minute and try again.',
+
+      reply:
+        'You are sending requests too quickly. Please wait a minute and try again.',
+
     };
+
   }
 
-  const url = extractUrl(input.text);
+  // =======================================
+  // CLEAN INPUT
+  // =======================================
+
+  const clean =
+    input.text.trim();
+
+  const lower =
+    clean.toLowerCase();
+
+  // =======================================
+  // HELP COMMAND
+  // =======================================
+
+  if (
+    lower === 'help'
+  ) {
+
+    return {
+
+      userHash,
+
+      rateLimited: false,
+
+      reply:
+`GuardianAI Commands
+
+Send a URL directly to scan it.
+
+watch <url>
+unwatch <url>
+watchlist
+help`,
+
+    };
+
+  }
+
+  // =======================================
+  // WATCH COMMAND
+  // =======================================
+
+  if (
+    lower.startsWith('watch ')
+  ) {
+
+    const rawUrl =
+      clean.replace(
+        /^watch\s+/i,
+        ''
+      ).trim();
+
+    try {
+
+      const safeUrl =
+        await validateScrapeUrl(
+          rawUrl
+        );
+
+      addWatch(
+        userHash,
+        safeUrl
+      );
+
+      return {
+
+        userHash,
+
+        rateLimited: false,
+
+        reply:
+          `✅ Added to watchlist:\n${safeUrl}`,
+
+      };
+
+    } catch {
+
+      return {
+
+        userHash,
+
+        rateLimited: false,
+
+        reply:
+          'Invalid URL for watchlist.',
+
+      };
+
+    }
+  }
+
+  // =======================================
+  // UNWATCH COMMAND
+  // =======================================
+
+  if (
+    lower.startsWith('unwatch ')
+  ) {
+
+    const rawUrl =
+      clean.replace(
+        /^unwatch\s+/i,
+        ''
+      ).trim();
+
+    try {
+
+      const safeUrl =
+        await validateScrapeUrl(
+          rawUrl
+        );
+
+      removeWatch(
+        userHash,
+        safeUrl
+      );
+
+      return {
+
+        userHash,
+
+        rateLimited: false,
+
+        reply:
+          `🗑 Removed from watchlist:\n${safeUrl}`,
+
+      };
+
+    } catch {
+
+      return {
+
+        userHash,
+
+        rateLimited: false,
+
+        reply:
+          'Invalid URL for unwatch command.',
+
+      };
+
+    }
+  }
+
+  // =======================================
+  // WATCHLIST COMMAND
+  // =======================================
+
+  if (
+    lower === 'watchlist'
+  ) {
+
+    const urls =
+      getWatchlist(userHash);
+
+    if (
+      urls.length === 0
+    ) {
+
+      return {
+
+        userHash,
+
+        rateLimited: false,
+
+        reply:
+          '📭 Your watchlist is empty.',
+
+      };
+
+    }
+
+    return {
+
+      userHash,
+
+      rateLimited: false,
+
+      reply:
+        '👀 Your watchlist:\n\n' +
+        urls.map(
+          u => `• ${u}`
+        ).join('\n'),
+
+    };
+
+  }
+
+  // =======================================
+  // URL EXTRACTION
+  // =======================================
+
+  const url =
+    extractUrl(clean);
 
   if (!url) {
+
     return {
+
       userHash,
+
       rateLimited: false,
-      reply: 'Send: Scan https://example.com',
+
+      reply:
+`Send a URL directly to scan it.
+
+Example:
+https://example.com`,
+
     };
+
   }
+
+  // =======================================
+  // SAFE URL VALIDATION
+  // =======================================
 
   let safeUrl: string;
+
   try {
-    safeUrl = await validateScrapeUrl(url);
+
+    safeUrl =
+      await validateScrapeUrl(
+        url
+      );
+
   } catch {
+
     return {
+
       userHash,
+
       rateLimited: false,
-      reply: 'Could not scan that URL. Please send a valid public http or https URL.',
+
+      reply:
+        'Could not scan that URL. Please send a valid public http or https URL.',
+
     };
+
   }
 
+  // =======================================
+  // RUN PIPELINE
+  // =======================================
+
   try {
-    const scraped = await scrape(safeUrl);
-    const tosResult = await analyseTos(scraped.tos);
-    const patterns = await detectPatterns(scraped.dom, tosResult, userHash);
-    const reply = await generateResponse(safeUrl, patterns, tosResult);
 
-    await appendScan(userHash, safeUrl, patterns.summary ?? []);
+    const result =
+      await run(
+        safeUrl,
+        userHash
+      );
+
+    // =====================================
+    // STORE ONLY SUCCESSFUL SCANS
+    // =====================================
+
+    if (
+      !result?.error
+    ) {
+
+      await appendScan(
+
+        userHash,
+
+        safeUrl,
+
+        result?.detectResult?.summary || []
+
+      );
+
+    }
 
     return {
+
       userHash,
+
       rateLimited: false,
-      reply,
+
+      reply:
+        result?.response ||
+        'Scan completed.',
+
     };
+
   } catch (err) {
-    console.error('GuardianAI dispatcher failed:', err);
+
+    console.error(
+      'GuardianAI dispatcher failed:',
+      err
+    );
 
     return {
+
       userHash,
+
       rateLimited: false,
-      reply: 'Something went wrong while scanning this URL. Please try again later.',
+
+      reply:
+        'Something went wrong while scanning this URL. Please try again later.',
+
     };
+
   }
 }
 
-export function extractUrl(text: string): string | null {
-  const match = text.match(/https?:\/\/[^\s<>"']+/i);
+// =========================================
+// URL EXTRACTION
+// =========================================
+
+export function extractUrl(
+  text: string
+): string | null {
+
+  const match =
+    text.match(
+      /https?:\/\/[^\s<>"']+/i
+    );
+
   return match?.[0] ?? null;
 }
