@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { appendFile } from "node:fs/promises";
 
-import { groqCall } from "./groq.ts";
+import { routeLLM } from "./llmRouter.ts";
 
 const DATA_DIR = "data";
 const NOVEL_QUEUE = path.join(DATA_DIR, "novel_queue.jsonl");
@@ -56,7 +56,8 @@ export async function fetchResearch(patternName: string) {
     }
 
     // AI summary
-    const summaryResult = await groqCall(
+    const summaryResult = await routeLLM(
+      'summarization',
       `How do these research papers relate to the dark pattern "${patternName}"?
 
 Papers:
@@ -67,13 +68,13 @@ Return STRICT JSON:
   "summary": "...",
   "relevance": "HIGH|MEDIUM|LOW"
 }`,
-      "fast",
       undefined,
       400
     ) as any;
 
     // Taxonomy mapping
-    const mappingResult = await groqCall(
+    const mappingResult = await routeLLM(
+      'taxonomy_mapping',
       `Map this potentially novel dark pattern into an existing taxonomy.
 
 Pattern:
@@ -88,7 +89,6 @@ Return STRICT JSON:
   "proposed_name": "...",
   "confidence": 0.0
 }`,
-      "reasoning",
       undefined,
       256
     ) as any;

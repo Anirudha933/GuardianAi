@@ -1,6 +1,6 @@
 // skills/analyseTos.skill.ts
 
-import { groqCall } from '../lib/groq.js';
+import { routeLLM } from '../lib/llmRouter.js';
 
 // Chunk text with overlap
 function chunk(text: string, size = 512, overlap = 64): string[] {
@@ -27,11 +27,11 @@ export default async function analyseTos(tosText: string) {
   // 🔹 Step 1: Filter relevant chunks (fast model)
   for (const c of chunks) {
     try {
-      const r = await groqCall(
+      const r = await routeLLM(
+        'tos_filter',
         `Does this ToS excerpt contain payment, renewal, consent, arbitration, or data sharing terms?
 Reply ONLY JSON: {"relevant": true|false}.
 Text: ${c.slice(0, 600)}`,
-        'fast',
         undefined,
         64
       ) as { 
@@ -70,13 +70,13 @@ if (isRelevant) {
   // 🔹 Step 2: Deep analysis (reasoning model)
   for (const c of relevant) {
     try {
-            const r = await groqCall(
+            const r = await routeLLM(
+            'legal_reasoning',
             `Extract manipulative clauses from this ToS excerpt.
             Return ONLY JSON:
             {"clauses":[{"text":"...","type":"auto_renewal|forced_arbitration|data_sharing|buried_opt_out|other","severity":1-10}]}
             If nothing suspicious, return {"clauses":[]}.
             Text: ${c}`,
-            'reasoning',
             undefined,
             1024
             ) as {
