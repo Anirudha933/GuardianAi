@@ -17,6 +17,7 @@
     "axios": "^1.7.2",
     "chromadb": "^3.4.3",
     "dotenv": "^16.6.1",
+    "grammy": "^1.42.0",
     "groq-sdk": "^0.9.1",
     "node-telegram-bot-api": "^0.67.0",
     "playwright": "^1.44.0",

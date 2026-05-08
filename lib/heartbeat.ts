@@ -4,8 +4,13 @@ import * as fs from "node:fs";
 
 import {
   getAllUsers,
-  getWatchlist
+  getWatchlist,
+  getTelegramChatId
 } from "./watchlist.ts";
+
+import {
+  sendTelegramMessage
+} from "./telegram.ts";
 
 const RESULTS_FILE = "data/results.json";
 
@@ -20,9 +25,11 @@ function ensureResultsFile() {
 
   // Ensure data directory exists
   if (!fs.existsSync("data")) {
+
     fs.mkdirSync("data", {
       recursive: true
     });
+
   }
 
   // Ensure results file exists
@@ -94,11 +101,15 @@ function isDifferent(
     const newPatterns =
       newVal?.detectResult?.patterns || [];
 
-    // Map old patterns
+    // =====================================
+    // BUILD OLD PATTERN MAP
+    // =====================================
+
     const oldMap =
       new Map<string, number>();
 
     for (const pattern of oldPatterns) {
+
       if (pattern?.type == null) {
         continue;
       }
@@ -108,28 +119,30 @@ function isDifferent(
 
       oldMap.set(
         String(pattern.type),
-        Number.isNaN(severity) ?
-          0 :
-          severity
+        Number.isNaN(severity)
+          ? 0
+          : severity
       );
     }
 
+    // =====================================
+    // CHECK NEW PATTERNS
+    // =====================================
+
     for (const pattern of newPatterns) {
 
-      // ===================================
-      // NEW PATTERN TYPE
-      // ===================================
-
-      if (!oldMap.has(pattern.type)) {
+      // New pattern type
+      if (
+        !oldMap.has(
+          String(pattern.type)
+        )
+      ) {
 
         return true;
 
       }
 
-      // ===================================
-      // SEVERITY CHANGE >= 2
-      // ===================================
-
+      // Severity changed >= 2
       const oldSeverity =
         oldMap.get(
           String(pattern.type)
@@ -177,7 +190,7 @@ async function runPipeline(
 }
 
 // =========================================
-// TELEGRAM NOTIFIER PLACEHOLDER
+// TELEGRAM DIFF ALERT
 // =========================================
 
 async function sendTelegramDiff(
@@ -186,16 +199,63 @@ async function sendTelegramDiff(
   result: any
 ) {
 
+  // =======================================
+  // LOOKUP TELEGRAM CHAT ID
+  // =======================================
+
+  const chatId =
+    getTelegramChatId(
+      userHash
+    );
+
+  if (!chatId) {
+
+    console.warn(
+      `[HEARTBEAT] No Telegram chatId for ${userHash}`
+    );
+
+    return;
+
+  }
+
+  // =======================================
+  // BUILD MESSAGE
+  // =======================================
+
   const patterns =
     result?.detectResult?.summary || [];
 
-  console.log(
-    `[TELEGRAM] ${userHash} → ${url}`
+  const risk =
+    result?.detectResult?.overall_risk || "NONE";
+
+  const message =
+`GuardianAI Weekly Update
+
+URL:
+${url}
+
+Risk:
+${risk}
+
+Patterns:
+${patterns.length > 0
+  ? patterns.map(
+      (p: string) => `• ${p}`
+    ).join('\n')
+  : 'No new issues detected.'
+}`;
+
+  // =======================================
+  // SEND TELEGRAM MESSAGE
+  // =======================================
+
+  await sendTelegramMessage(
+    chatId,
+    message
   );
 
   console.log(
-    `[TELEGRAM] Patterns:`,
-    patterns
+    `[TELEGRAM] Alert sent to ${chatId}`
   );
 }
 
@@ -278,30 +338,41 @@ export async function startHeartbeat() {
                 userHash
               );
 
-            // Save new result
+            // =================================
+            // SAVE RESULT
+            // =================================
+
             newResults[userHash][url] =
               result;
 
-            // Get previous result
+            // =================================
+            // LOAD OLD RESULT
+            // =================================
+
             const oldResult =
               oldResults?.[userHash]?.[url];
 
-            // =============================
+            // =================================
             // DIFF DETECTION
-            // =============================
+            // =================================
 
             if (
+
               isDifferent(
                 oldResult,
                 result
               )
+
             ) {
 
               console.log(
                 `[DIFF] Change detected on ${url}`
               );
 
-              // Telegram alert
+              // =================================
+              // TELEGRAM ALERT
+              // =================================
+
               await sendTelegramDiff(
                 userHash,
                 url,
