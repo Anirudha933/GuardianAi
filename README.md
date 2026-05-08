@@ -409,3 +409,28 @@ Every scan:
    -> updates semantic memory (community-wide)
    -> improves future detections for all users
 ```
+
+## SOFTWARE DEVELOPMENT KIT(SDK) 
+
+The following SDKs, frameworks, and APIs were used in the development of GuardianAI:
+
+1. OpenClaw Framework
+   - Used for AI agent orchestration, session management, gateway communication, and channel integration.
+
+2. Telegram Bot API / SDK
+   - Used for real-time user interaction through Telegram channels.
+
+3. Ollama API
+   - Used for connecting and managing Large Language Models (LLMs) such as Llama 3.1.
+
+4. Node.js Runtime & Libraries
+   - Used for backend logic, custom skill execution, dispatcher routing, and heartbeat services.
+
+5. ChromaDB Client SDK
+   - Used for vector-based memory storage and retrieval.
+
+6. WebSocket Communication APIs
+   - Used for maintaining persistent communication between OpenClaw gateway and agents.
+
+7. Supabase SDK (if applicable)
+   - Used for authentication and cloud database integration.
